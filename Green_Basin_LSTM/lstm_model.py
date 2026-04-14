@@ -1,7 +1,8 @@
 """
-lstm_model.py  —  MAIN SCRIPT
+lstm_model.py
+MAIN SCRIPT
 ==============================
-Green Basin LSTM — Unregulated Streamflow Prediction
+Green Basin LSTM - Unregulated Streamflow Prediction
 GEOG 6150 Hydroinformatics, University of Utah
 Author: Magnus Tveit
 
@@ -18,17 +19,14 @@ Usage
     conda activate torch310env
     python lstm_model.py
 
-Training sites (all unregulated — no major dams upstream)
+Training sites (all unregulated - no major dams upstream)
 ----------------------------------------------------------
-    09217000  Green River nr Green River, WY       (Train 1 — snowmelt headwater)
-    09306500  White River nr Watson, UT            (Train 2 — plateau tributary)
-    09239500  Yampa River at Steamboat Springs, CO (Train 3 — upper free-flowing)
+    09217000  Green River nr Green River, WY       (Train 1 - snowmelt headwater)
+    09306500  White River nr Watson, UT            (Train 2 - plateau tributary)
+    09239500  Yampa River at Steamboat Springs, CO (Train 3 - upper free-flowing)
 
 Test site (never seen during training)
---------------------------------------
-    09251000  Yampa River at Deerlodge Park, CO
-              Downstream of Train 3 — adds Little Snake R. confluence.
-              Tests whether the model generalizes spatially on the same river.
+09251000  Yampa River at Deerlodge Park, CO
 
 Model
 -----
@@ -60,17 +58,17 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, ConcatDataset
 import joblib
 
-# ── Course helper (professor's file — do not modify) ─────────────────────────
+# Dr. Johnson helper)
 from notebooks import LSTM_helper
 
-# ── Data helpers ──────────────────────────────────────────────────────────────
+# Other helpers
 from notebooks.data_utils import (
     SITES, TRAIN_IDS, TEST_ID,
     DATE_COL, TARGET_COL, FEATURE_COLS,
     load_hydrodf, split_by_year,
 )
 
-# ── Training and plotting helpers ─────────────────────────────────────────────
+# Training and plotting helpers
 from notebooks.train_utils import (
     train_model, compute_metrics, print_metrics,
     plot_training_history, plot_observed_vs_predicted,
@@ -78,24 +76,18 @@ from notebooks.train_utils import (
 )
 
 
-# ── Reproducibility ───────────────────────────────────────────────────────────
+# Reproducibility Set Up
 
 SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
-
-# ── Device ────────────────────────────────────────────────────────────────────
-# GPU is used automatically if available — otherwise falls back to CPU.
-# To force CPU: set environment variable CUDA_VISIBLE_DEVICES=""
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-
+# Paths
 DATA_DIR  = os.path.join('data', 'HydroDF')
 MODEL_DIR = 'model'
 FIG_DIR   = 'figures'
@@ -104,13 +96,13 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(FIG_DIR,   exist_ok=True)
 
 
-# ── Hyperparameters — match professor's defaults ──────────────────────────────
+# Hyperparameters
 
-LOOKBACK_DAYS = 30    # days of antecedent conditions fed as input window
-BATCH_SIZE    = 64    # mini-batch size
-EPOCHS        = 50    # maximum training epochs
-PATIENCE      = 8     # early stopping patience
-LEARNING_RATE = 1e-3  # Adam learning rate
+LOOKBACK_DAYS = 30     # days of antecedent conditions fed as input window
+BATCH_SIZE    = 64     
+EPOCHS        = 50     
+PATIENCE      = 8      # early stopping
+LEARNING_RATE = 1e-3  
 
 TRAIN_END_YEAR  = 2014
 VAL_START_YEAR  = 2015
@@ -119,7 +111,7 @@ TEST_START_YEAR = 2019
 TEST_END_YEAR   = 2023
 
 
-# ── Helper: prepare one site's DataLoaders ────────────────────────────────────
+# Helper: prepare one site's DataLoaders Helper
 
 def prepare_site_loaders(site_id: str):
     """
@@ -186,7 +178,7 @@ def prepare_site_loaders(site_id: str):
     return train_loader, val_loader, target_scaler
 
 
-# ── Helper: evaluate one site on its test period ─────────────────────────────
+# Helper: evaluate one site on its test period
 
 def evaluate_site(site_id: str):
     """
@@ -245,7 +237,7 @@ def evaluate_site(site_id: str):
     }
 
 
-# ── Main pipeline ─────────────────────────────────────────────────────────────
+# Main pipeline
 
 if __name__ == '__main__':
 
@@ -255,7 +247,7 @@ if __name__ == '__main__':
     print(f'Test site      : {TEST_ID}')
     print('=' * 60)
 
-    # ── Step 1: Build DataLoaders for all training sites ──────────────────
+    # Step 1: Build DataLoaders for all training sites
     print('\n[1/5] Preparing training data...')
     train_loaders, val_loaders = [], []
 
@@ -277,7 +269,7 @@ if __name__ == '__main__':
         ConcatDataset([vl.dataset for vl in val_loaders]),
         batch_size=BATCH_SIZE, shuffle=False)
 
-    # ── Step 2: Define model ──────────────────────────────────────────────
+    # Step 2: Define model
     print('\n[2/5] Defining model...')
     model = LSTM_helper.LSTMRegressor(
         input_size=len(FEATURE_COLS),
@@ -287,7 +279,7 @@ if __name__ == '__main__':
     ).to(device)
     print(model)
 
-    # ── Step 3: Train ─────────────────────────────────────────────────────
+    # Step 3: Train
     print(f'\n[3/5] Training (max {EPOCHS} epochs, patience={PATIENCE})...')
     model, history = train_model(
         model, combined_train, combined_val,
@@ -301,7 +293,7 @@ if __name__ == '__main__':
     MODEL_PATH = os.path.join(MODEL_DIR, 'green_basin_lstm.pt')
     LSTM_helper.save_model(model, LOOKBACK_DAYS, FEATURE_COLS, ref_fs, ref_ts, MODEL_PATH)
 
-    # ── Step 4: Evaluate all four sites ───────────────────────────────────
+    # Step 4: Evaluate all four sites
     print('\n[4/5] Evaluating all sites on test period (2019–2023)...')
     results = {}
     for sid in TRAIN_IDS + [TEST_ID]:
@@ -317,6 +309,6 @@ if __name__ == '__main__':
 
     print('\n' + '=' * 60)
     print('Pipeline complete.')
-    print(f'  Model  → {MODEL_PATH}')
-    print(f'  Figures → {FIG_DIR}/')
+    print(f'  Model  -> {MODEL_PATH}')
+    print(f'  Figures -> {FIG_DIR}/')
     print('=' * 60)
