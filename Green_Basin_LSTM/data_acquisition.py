@@ -1,26 +1,26 @@
 """
-data_acquisition.py
+data_acquisition.py  —  SETUP SCRIPT (run once before lstm_model.py)
+=====================================================================
+Fetches daily streamflow from USGS NWIS and climate data from Daymet
+for all four study sites. Saves one CSV per site to data/HydroDF/.
 
-Fetches daily streamflow (USGS NWIS) and climate data (Daymet) for all four
-study sites and saves one HydroDF CSV per site to data/HydroDF/.
-
-Run this script first before lstm_model.py.
+After running this once, data is cached to disk. Re-running will load
+from cache without making any API calls — making this fully reproducible.
 
 Usage
 -----
     conda activate torch310env
     python data_acquisition.py
 
-Sites
------
-    09217000 — Green River nr Green River, WY       (Train 1)
-    09306500 — White River nr Watson, UT            (Train 2)
-    09239500 — Yampa River at Steamboat Springs, CO (Train 3)
-    09251000 — Yampa River at Deerlodge Park, CO    (Test — unseen during training)
+    Then run the main pipeline:
+    python lstm_model.py
 
-Outputs
--------
-    data/HydroDF/HydroDF_{SiteName}_{SiteID}.csv   (one per site)
+Output files
+------------
+    data/HydroDF/HydroDF_Green_R_nr_Green_River_WY_09217000.csv
+    data/HydroDF/HydroDF_White_R_nr_Watson_UT_09306500.csv
+    data/HydroDF/HydroDF_Yampa_R_at_Steamboat_Springs_CO_09239500.csv
+    data/HydroDF/HydroDF_Yampa_R_at_Deerlodge_Park_CO_09251000.csv
     figures/fig_eda_timeseries.png
 """
 
@@ -30,11 +30,9 @@ warnings.filterwarnings('ignore')
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import pandas as pd
 
-from utils.data_utils import (
-    SITES, TRAIN_IDS, TEST_ID,
-    DATE_COL, TARGET_COL,
+from notebooks.data_utils import (
+    SITES, DATE_COL, TARGET_COL,
     build_hydrodf,
 )
 
@@ -46,25 +44,27 @@ END_DATE   = '2023-12-31'
 DATA_DIR = os.path.join('data', 'HydroDF')
 FIG_DIR  = 'figures'
 
+# Create output directories if they do not exist
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(FIG_DIR,  exist_ok=True)
 
 
-# ── Fetch all sites ───────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     print('=' * 60)
-    print('Green Basin LSTM — Data Acquisition')
+    print('Green Basin LSTM — Data Acquisition (setup)')
     print(f'Date range: {START_DATE} → {END_DATE}')
     print('=' * 60)
 
+    # Fetch or load from cache for all four sites
     hydro_dfs = {}
-    for site_id in SITES:
-        print(f'\n[{SITES[site_id]["role"]}] {site_id}')
+    for site_id, info in SITES.items():
+        print(f'\n[{info["role"]}] {site_id} — {info["name"].replace("_", " ")}')
         hydro_dfs[site_id] = build_hydrodf(site_id, START_DATE, END_DATE, DATA_DIR)
 
-    # ── EDA figure ────────────────────────────────────────────────────────────
-    print('\nGenerating EDA time series figure...')
+    # ── EDA figure — visual check of all four time series ─────────────────────
+    print('\nGenerating EDA figure...')
 
     short_labels = {
         '09217000': 'Green R. nr Green River, WY\n(Train 1 — snowmelt headwater)',
@@ -96,7 +96,7 @@ def main():
     plt.close(fig)
     print(f'Saved: {out}')
 
-    print('\nData acquisition complete. Run lstm_model.py next.')
+    print('\nSetup complete. Now run: python lstm_model.py')
     print('=' * 60)
 
 

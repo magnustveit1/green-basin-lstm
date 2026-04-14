@@ -8,7 +8,7 @@ dependencies:
   - pytorch
   - torchvision
   - torchaudio
-  - pytorch-cuda        # enables GPU support — falls back to CPU automatically
+  - pytorch-cuda        # GPU support — falls back to CPU automatically
   - ca-certificates
   - openssl
   - ipykernel
@@ -20,6 +20,6 @@ dependencies:
   - pip
   - pip:
     - sympy==1.13.1
-    - dataretrieval     # USGS NWIS streamflow fetch
-    - pydaymet          # Daymet climate data fetch
+    - dataretrieval     # USGS NWIS streamflow retrieval
+    - pydaymet          # Daymet daily climate data retrieval
     - joblib            # scaler serialization
