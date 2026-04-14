@@ -1,11 +1,11 @@
 """
-data_acquisition.py  —  SETUP SCRIPT (run once before lstm_model.py)
-=====================================================================
+data_acquisition.py
+SETUP SCRIPT (run once before lstm_model.py)
 Fetches daily streamflow from USGS NWIS and climate data from Daymet
 for all four study sites. Saves one CSV per site to data/HydroDF/.
 
-After running this once, data is cached to disk. Re-running will load
-from cache without making any API calls — making this fully reproducible.
+After running this once, data is cached. Re-running will load
+from cache without making any API calls.
 
 Usage
 -----
@@ -36,7 +36,7 @@ from notebooks.data_utils import (
     build_hydrodf,
 )
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# Configuration
 
 START_DATE = '1990-01-01'
 END_DATE   = '2023-12-31'
@@ -49,33 +49,33 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(FIG_DIR,  exist_ok=True)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 
 def main():
     print('=' * 60)
-    print('Green Basin LSTM — Data Acquisition (setup)')
-    print(f'Date range: {START_DATE} → {END_DATE}')
+    print('Green Basin LSTM - Data Acquisition (setup)')
+    print(f'Date range: {START_DATE} -> {END_DATE}')
     print('=' * 60)
 
     # Fetch or load from cache for all four sites
     hydro_dfs = {}
     for site_id, info in SITES.items():
-        print(f'\n[{info["role"]}] {site_id} — {info["name"].replace("_", " ")}')
+        print(f'\n[{info["role"]}] {site_id} - {info["name"].replace("_", " ")}')
         hydro_dfs[site_id] = build_hydrodf(site_id, START_DATE, END_DATE, DATA_DIR)
 
-    # ── EDA figure — visual check of all four time series ─────────────────────
+    # EDA figure
     print('\nGenerating EDA figure...')
 
     short_labels = {
-        '09217000': 'Green R. nr Green River, WY\n(Train 1 — snowmelt headwater)',
-        '09306500': 'White R. nr Watson, UT\n(Train 2 — plateau tributary)',
-        '09239500': 'Yampa R. at Steamboat Springs, CO\n(Train 3 — upper free-flowing)',
-        '09251000': 'Yampa R. at Deerlodge Park, CO\n(Test — downstream, unseen)',
+        '09217000': 'Green R. nr Green River, WY\n(Train 1 - snowmelt headwater)',
+        '09306500': 'White R. nr Watson, UT\n(Train 2 - plateau tributary)',
+        '09239500': 'Yampa R. at Steamboat Springs, CO\n(Train 3 - upper free-flowing)',
+        '09251000': 'Yampa R. at Deerlodge Park, CO\n(Test - downstream, unseen)',
     }
     colors = ['#1f77b4', '#2ca02c', '#9467bd', '#d62728']
 
     fig, axes = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
-    fig.suptitle('Daily Mean Streamflow — Study Sites (1990–2023)',
+    fig.suptitle('Daily Mean Streamflow - Study Sites (1990–2023)',
                  fontsize=13, fontweight='bold', y=1.01)
 
     for ax, sid, color in zip(axes, SITES.keys(), colors):
