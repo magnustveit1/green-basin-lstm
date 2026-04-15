@@ -303,14 +303,13 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
     """
     site_ids = list(results.keys())
     fig, axes = plt.subplots(len(site_ids), 1,
-                             figsize=(13, 3.2 * len(site_ids)), sharex=False)
+                             figsize=(13, 2.6 * len(site_ids)), sharex=False)
     if len(site_ids) == 1:
         axes = [axes]
 
 
-    fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019-2023)',
-
-                 fontsize=13, fontweight='bold', y=1.01)
+    fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019–2023)',
+                 fontsize=15, fontweight='bold', y=1.0)
 
     for ax, sid in zip(axes, site_ids):
         r, m = results[sid], results[sid]['metrics']
@@ -321,25 +320,26 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
         ax.text(0.99, 0.96,
                 f'RMSE={m["RMSE"]:.3f} cms  MAE={m["MAE"]:.3f} cms  '
                 f'R²={m["R2"]:.3f}  NSE={m["NSE"]:.3f}',
-                transform=ax.transAxes, ha='right', va='top', fontsize=8,
+                transform=ax.transAxes, ha='right', va='top', fontsize=10,
                 bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.85))
 
         if r['role'] == 'Test':
             ax.set_facecolor('#fff3f3')
             ax.set_title(f'{r["label"]}  ★ TEST - unseen during training',
-                         fontsize=9, loc='left', fontweight='bold')
+                         fontsize=11, loc='left', fontweight='bold')
         else:
-            ax.set_title(r['label'], fontsize=9, loc='left')
+            ax.set_title(r['label'], fontsize=11, loc='left')
 
-        ax.set_ylabel('Streamflow (cms)', fontsize=9)
-        ax.legend(loc='upper left', fontsize=8, framealpha=0.8)
+        ax.set_ylabel('Streamflow (cms)', fontsize=11)
+        ax.legend(loc='upper left', fontsize=10, framealpha=0.8)
         ax.xaxis.set_major_locator(mdates.YearLocator())
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
         ax.tick_params(labelsize=8)
         ax.grid(True, alpha=0.3, lw=0.5)
 
-    axes[-1].set_xlabel('Date', fontsize=10)
-    fig.subplots_adjust(hspace=0.65)
+    axes[-1].set_xlabel('Date', fontsize=12)
+    fig.subplots_adjust(hspace=0.35)
+    fig.subplots_adjust(hspace=0.35, top=0.93)
 
     out = os.path.join(fig_dir, 'fig_observed_vs_predicted.png')
     fig.savefig(out, dpi=150, bbox_inches='tight')
