@@ -53,7 +53,7 @@ def train_model(model, train_loader, val_loader, device,
 
     for epoch in range(1, epochs + 1):
 
-        # Training pass — gradients are computed and weights updated
+        # Training pass - gradients are computed and weights updated
         model.train()
         batch_losses = []
         for xb, yb in train_loader:
@@ -68,7 +68,7 @@ def train_model(model, train_loader, val_loader, device,
 
         train_loss = float(np.mean(batch_losses))
 
-        # Validation pass — no gradient updates, just measure loss
+        # Validation pass - no gradient updates, just measure loss
         val_loss, _, _ = LSTM_helper.evaluate(model, criterion, device, val_loader)
 
         history['train_loss'].append(train_loss)
@@ -76,7 +76,7 @@ def train_model(model, train_loader, val_loader, device,
 
         print(f'Epoch {epoch:03d} | train loss = {train_loss:.5f} | val loss = {val_loss:.5f}')
 
-        # Early stopping — save best weights, stop if no improvement
+        # Early stopping - save best weights, stop if no improvement
         if val_loss < best_val_loss:
             best_val_loss    = val_loss
             best_state       = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -165,7 +165,7 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
     if len(site_ids) == 1:
         axes = [axes]
 
-    fig.suptitle('Observed vs. Predicted Streamflow — Evaluation Period (2019–2023)',
+    fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019–2023)',
                  fontsize=13, fontweight='bold', y=1.01)
 
     for ax, sid in zip(axes, site_ids):
@@ -182,7 +182,7 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
 
         if r['role'] == 'Test':
             ax.set_facecolor('#fff3f3')
-            ax.set_title(f'{r["label"]}  ★ TEST — unseen during training',
+            ax.set_title(f'{r["label"]}  ★ TEST - unseen during training',
                          fontsize=9, loc='left', fontweight='bold')
         else:
             ax.set_title(r['label'], fontsize=9, loc='left')
@@ -213,7 +213,7 @@ def plot_scatter(results: dict, fig_dir: str):
     if len(site_ids) == 1:
         axes = [axes]
 
-    fig.suptitle('Observed vs. Predicted Streamflow — Scatter', fontsize=12, fontweight='bold')
+    fig.suptitle('Observed vs. Predicted Streamflow - Scatter', fontsize=12, fontweight='bold')
 
     for ax, sid in zip(axes, site_ids):
         r, m = results[sid], results[sid]['metrics']
@@ -255,7 +255,7 @@ def plot_performance_summary(results: dict, fig_dir: str):
     nse_vals  = [results[s]['metrics']['NSE']  for s in site_ids]
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
-    fig.suptitle('Performance Summary — All Sites (Evaluation Period 2019–2023)',
+    fig.suptitle('Performance Summary - All Sites (Evaluation Period 2019–2023)',
                  fontsize=12, fontweight='bold')
 
     for ax, vals, ylabel, title in zip(
