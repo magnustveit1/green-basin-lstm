@@ -357,7 +357,7 @@ def plot_scatter(results: dict, fig_dir: str):
     if len(site_ids) == 1:
         axes = [axes]
 
-    fig.suptitle('Observed vs. Predicted Streamflow - Scatter', fontsize=12, fontweight='bold')
+    fig.suptitle('Observed vs. Predicted Streamflow - Scatter', fontsize=17.5, fontweight='bold')
 
     for ax, sid in zip(axes, site_ids):
         r, m = results[sid], results[sid]['metrics']
@@ -369,11 +369,12 @@ def plot_scatter(results: dict, fig_dir: str):
                 max(r['obs_cms'].max(), r['pred_cms'].max())]
         ax.plot(lims, lims, 'k--', lw=1)
 
-        ax.set_xlabel('Observed (cms)', fontsize=9)
-        ax.set_ylabel('Predicted (cms)', fontsize=9)
+        ax.set_xlabel('Observed (cms)', fontsize=16)
+        ax.set_ylabel('Predicted (cms)', fontsize=16)
         ax.set_title(f'{r["label"].split("(")[0].strip()}\n'
-                     f'NSE={m["NSE"]:.3f}  R²={m["R2"]:.3f}', fontsize=8.5)
+                     f'NSE={m["NSE"]:.3f}  R²={m["R2"]:.3f}', fontsize=14)
         ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=12)
 
     fig.tight_layout()
 

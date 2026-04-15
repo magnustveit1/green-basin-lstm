@@ -103,7 +103,7 @@ os.makedirs(FIG_DIR,   exist_ok=True)
 LOOKBACK_DAYS = 30     # days of antecedent conditions fed as input window
 BATCH_SIZE    = 64     
 EPOCHS        = 50     
-PATIENCE      = 6      # early stopping
+PATIENCE      = 50      # early stopping
 LEARNING_RATE = 1e-3  
 
 TRAIN_END_YEAR  = 2014
