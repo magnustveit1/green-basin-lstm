@@ -400,7 +400,7 @@ def plot_performance_summary(results: dict, fig_dir: str):
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
     fig.suptitle('Performance Summary - All Sites (Evaluation Period 2019–2023)',
-                 fontsize=12, fontweight='bold')
+                 fontsize=14, fontweight='bold')
 
     for ax, vals, ylabel, title in zip(
             axes,
@@ -409,15 +409,17 @@ def plot_performance_summary(results: dict, fig_dir: str):
             ['Root Mean Squared Error', 'Mean Absolute Error', 'Nash-Sutcliffe Efficiency']):
 
         bars = ax.bar(labels, vals, color=colors, edgecolor='white')
-        ax.set_title(title, fontsize=10)
-        ax.set_ylabel(ylabel, fontsize=9)
+        ax.set_title(title, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=11)
         ax.grid(True, axis='y', alpha=0.3)
         ax.tick_params(labelsize=8)
+        ax.tick_params(axis='x', labelsize=10)
+
 
         for bar, v in zip(bars, vals):
             ypos = bar.get_height() + max(np.abs(vals)) * 0.015
             ax.text(bar.get_x() + bar.get_width() / 2, ypos,
-                    f'{v:.3f}', ha='center', fontsize=8)
+                    f'{v:.3f}', ha='center', fontsize=10)
 
     axes[2].axhline(0, color='black', lw=0.8, ls='--')
     fig.tight_layout()
