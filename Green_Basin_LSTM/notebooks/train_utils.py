@@ -60,7 +60,10 @@ def train_model(model, train_loader, val_loader, device,
 
     for epoch in range(1, epochs + 1):
 
+
         # Training pass
+        # Training pass - gradients are computed and weights updated
+
         model.train()
         batch_losses = []
         for xb, yb in train_loader:
@@ -75,7 +78,10 @@ def train_model(model, train_loader, val_loader, device,
 
         train_loss = float(np.mean(batch_losses))
 
+
         # Validation pass
+        # Validation pass - no gradient updates, just measure loss
+
         val_loss, _, _ = LSTM_helper.evaluate(model, criterion, device, val_loader)
 
         history['train_loss'].append(train_loss)
@@ -83,7 +89,10 @@ def train_model(model, train_loader, val_loader, device,
 
         print(f'Epoch {epoch:03d} | train loss = {train_loss:.5f} | val loss = {val_loss:.5f}')
 
+
         # Early stopping with save best weights
+        # Early stopping - save best weights, stop if no improvement
+
         if val_loss < best_val_loss:
             best_val_loss    = val_loss
             best_state       = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -298,7 +307,10 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
     if len(site_ids) == 1:
         axes = [axes]
 
+
     fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019-2023)',
+    fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019–2023)',
+
                  fontsize=13, fontweight='bold', y=1.01)
 
     for ax, sid in zip(axes, site_ids):
