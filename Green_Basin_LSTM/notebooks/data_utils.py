@@ -19,8 +19,8 @@ from dataretrieval import nwis
 import pydaymet as daymet
 
 
-# ── Site definitions ──────────────────────────────────────────────────────────
-# All four gauges are confirmed unregulated — no major dams upstream.
+# Site definitions
+# All four gauges are confirmed unregulated - no major dams upstream.
 # The test site (09251000) is on the same river as Train 3 (Yampa) but
 # downstream, adding the Little Snake River confluence. The model never
 # sees this site during training, testing spatial generalization.
@@ -36,13 +36,13 @@ TRAIN_IDS    = ['09217000', '09306500', '09239500']
 TEST_ID      = '09251000'
 DAYMET_VARS  = ['prcp', 'tmax', 'swe']
 
-# Column names — match the professor's HydroDF convention
+# Column names - match the professor's HydroDF convention
 DATE_COL     = 'Date'
 TARGET_COL   = 'flow_cms'
 FEATURE_COLS = ['prcp_mm_day', 'tmax_degC', 'swe_cm']
 
 
-# ── Streamflow ────────────────────────────────────────────────────────────────
+# Streamflow
 
 def fetch_streamflow(site_id: str, start: str, end: str) -> pd.DataFrame:
     """
@@ -63,17 +63,17 @@ def fetch_streamflow(site_id: str, start: str, end: str) -> pd.DataFrame:
     # Remove timezone info so dates merge cleanly with Daymet dates
     df[DATE_COL] = pd.to_datetime(df[DATE_COL]).dt.tz_localize(None)
 
-    # Convert cfs → cms
+    # Convert cfs -> cms
     df['flow_cms'] = df['flow_cfs'] * 0.0283168
     df = df.drop(columns=['flow_cfs'])
     df.insert(1, 'site_no', site_id)
     df = df.dropna(subset=['flow_cms'])
 
-    print(f'{len(df):,} records ({df[DATE_COL].min().date()} → {df[DATE_COL].max().date()})')
+    print(f'{len(df):,} records ({df[DATE_COL].min().date()} -> {df[DATE_COL].max().date()})')
     return df
 
 
-# ── Daymet climate ────────────────────────────────────────────────────────────
+# Daymet climate
 
 def fetch_daymet(site_id: str, lat: float, lon: float,
                  start: str, end: str) -> pd.DataFrame:
@@ -89,7 +89,7 @@ def fetch_daymet(site_id: str, lat: float, lon: float,
     """
     print(f'  [Daymet] {site_id}', end=' ... ')
 
-    # get_bycoords returns a DataFrame — date is the index
+    # get_bycoords returns a DataFrame with date as the index
     df = daymet.get_bycoords(
         coords=(lon, lat),
         dates=(start, end),
@@ -100,7 +100,7 @@ def fetch_daymet(site_id: str, lat: float, lon: float,
     # Bring the date index out as a plain column
     df = df.reset_index()
 
-    # pydaymet column names include units — find and rename them robustly
+    # pydaymet column names include units - find and rename them robustly
     # regardless of whether the column is named 'time', 'Date', or 'index'
     rename = {}
     for col in df.columns:
@@ -125,7 +125,7 @@ def fetch_daymet(site_id: str, lat: float, lon: float,
     return df
 
 
-# ── Merge and save ────────────────────────────────────────────────────────────
+# Merge and save
 
 def build_hydrodf(site_id: str, start: str, end: str, data_dir: str) -> pd.DataFrame:
     """
@@ -135,7 +135,7 @@ def build_hydrodf(site_id: str, start: str, end: str, data_dir: str) -> pd.DataF
     File is named HydroDF_{SiteName}_{SiteID}.csv to match the professor's
     HydroDF naming convention from Hydro_LSTM.ipynb.
 
-    If the CSV already exists it is loaded from disk — no API calls are made.
+    If the CSV already exists it is loaded from disk - no API calls are made.
     This makes re-runs fast and the pipeline reproducible.
 
     Returns the merged DataFrame.
@@ -145,17 +145,17 @@ def build_hydrodf(site_id: str, start: str, end: str, data_dir: str) -> pd.DataF
 
     # Load from cache if already fetched
     if os.path.exists(out_path):
-        print(f'  [cache] {site_id} — {os.path.basename(out_path)}')
+        print(f'  [cache] {site_id} - {os.path.basename(out_path)}')
         return pd.read_csv(out_path, parse_dates=[DATE_COL])
 
     # Fetch both sources
     flow_df    = fetch_streamflow(site_id, start, end)
     climate_df = fetch_daymet(site_id, info['lat'], info['lon'], start, end)
 
-    # Inner join on Date — only keep days where both sources have data
+    # Inner join on Date - only keep days where both sources have data
     merged = pd.merge(flow_df, climate_df, on=DATE_COL, how='inner')
 
-    # Fill any remaining gaps — matches the professor's approach in Hydro_LSTM.ipynb
+    # Fill any remaining gaps - matches the professor's approach in Hydro_LSTM.ipynb
     cols = FEATURE_COLS + [TARGET_COL]
     if merged[cols].isnull().sum().sum() > 0:
         merged[cols] = (
@@ -166,7 +166,7 @@ def build_hydrodf(site_id: str, start: str, end: str, data_dir: str) -> pd.DataF
         )
 
     merged.to_csv(out_path, index=False)
-    print(f'  Saved → {os.path.basename(out_path)}  ({len(merged):,} rows)')
+    print(f'  Saved -> {os.path.basename(out_path)}  ({len(merged):,} rows)')
     return merged
 
 
@@ -185,7 +185,7 @@ def load_hydrodf(site_id: str, data_dir: str) -> pd.DataFrame:
     return pd.read_csv(os.path.join(data_dir, matches[0]), parse_dates=[DATE_COL])
 
 
-# ── Year-based split ──────────────────────────────────────────────────────────
+# Year-based split
 
 def split_by_year(df: pd.DataFrame,
                   train_end: int, val_start: int, val_end: int,

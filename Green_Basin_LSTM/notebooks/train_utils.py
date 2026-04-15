@@ -8,19 +8,26 @@ Do not run this file directly.
 
 import os
 import math
+import joblib
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import MinMaxScaler
 
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 
 from notebooks import LSTM_helper
+from notebooks.data_utils import (
+    DATE_COL, TARGET_COL, FEATURE_COLS,
+    load_hydrodf, split_by_year,
+)
 
 
-# ── Training loop ─────────────────────────────────────────────────────────────
+# Training loop
 
 def train_model(model, train_loader, val_loader, device,
                 epochs: int, learning_rate: float, patience: int):
@@ -53,7 +60,7 @@ def train_model(model, train_loader, val_loader, device,
 
     for epoch in range(1, epochs + 1):
 
-        # Training pass — gradients are computed and weights updated
+        # Training pass
         model.train()
         batch_losses = []
         for xb, yb in train_loader:
@@ -68,7 +75,7 @@ def train_model(model, train_loader, val_loader, device,
 
         train_loss = float(np.mean(batch_losses))
 
-        # Validation pass — no gradient updates, just measure loss
+        # Validation pass
         val_loss, _, _ = LSTM_helper.evaluate(model, criterion, device, val_loader)
 
         history['train_loss'].append(train_loss)
@@ -76,7 +83,7 @@ def train_model(model, train_loader, val_loader, device,
 
         print(f'Epoch {epoch:03d} | train loss = {train_loss:.5f} | val loss = {val_loss:.5f}')
 
-        # Early stopping — save best weights, stop if no improvement
+        # Early stopping with save best weights
         if val_loss < best_val_loss:
             best_val_loss    = val_loss
             best_state       = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -94,7 +101,7 @@ def train_model(model, train_loader, val_loader, device,
     return model, history
 
 
-# ── Metrics ───────────────────────────────────────────────────────────────────
+# Metrics
 
 def compute_metrics(obs: np.ndarray, pred: np.ndarray) -> dict:
     """
@@ -125,7 +132,133 @@ def print_metrics(label: str, metrics: dict):
           f'R²={metrics["R2"]:.4f}  NSE={metrics["NSE"]:.4f}')
 
 
-# ── Figures ───────────────────────────────────────────────────────────────────
+# Prepare one site's DataLoaders
+
+def prepare_site_loaders(site_id: str, data_dir: str, model_dir: str, cfg: dict):
+    """
+    Load HydroDF CSV for one site, split by year, fit scalers on training
+    data only, apply scalers, build sequences, and return DataLoaders.
+
+    Scalers are saved to model/ so they can be reloaded for evaluation.
+    Follows the professor's workflow from Hydro_LSTM.ipynb step by step.
+
+    Returns
+    -------
+    train_loader, val_loader : DataLoaders for this site
+    target_scaler            : fitted target scaler (needed for inverse-transform)
+    """
+    df = load_hydrodf(site_id, data_dir)
+
+    # Keep only the columns needed, fill any gaps
+    df = df[[DATE_COL] + FEATURE_COLS + [TARGET_COL]].copy()
+    df[FEATURE_COLS + [TARGET_COL]] = (
+        df[FEATURE_COLS + [TARGET_COL]]
+        .interpolate(method='linear', limit_direction='both')
+        .ffill().bfill()
+    )
+
+    # Split by year
+    train_df, val_df, _ = split_by_year(
+        df, cfg['TRAIN_END_YEAR'], cfg['VAL_START_YEAR'], cfg['VAL_END_YEAR'],
+        cfg['TEST_START_YEAR'], cfg['TEST_END_YEAR']
+    )
+
+    # Fit separate scalers on training data only — prevents data leakage
+    feature_scaler = MinMaxScaler()
+    target_scaler  = MinMaxScaler()
+    feature_scaler.fit(train_df[FEATURE_COLS])
+    target_scaler.fit(train_df[[TARGET_COL]])
+
+    # Save scalers — LSTM_helper.add_scaled_columns loads them by path
+    joblib.dump(feature_scaler, os.path.join(model_dir, 'feature_scaler.pkl'))
+    joblib.dump(target_scaler,  os.path.join(model_dir, 'target_scaler.pkl'))
+
+    # Also save with site ID so each site's scalers are preserved
+    joblib.dump(feature_scaler, os.path.join(model_dir, f'feature_scaler_{site_id}.pkl'))
+    joblib.dump(target_scaler,  os.path.join(model_dir, f'target_scaler_{site_id}.pkl'))
+
+    # Apply scalers — matches professor's add_scaled_columns pattern
+    train_scaled = LSTM_helper.add_scaled_columns(model_dir, FEATURE_COLS, TARGET_COL, train_df)
+    val_scaled   = LSTM_helper.add_scaled_columns(model_dir, FEATURE_COLS, TARGET_COL, val_df)
+
+    # Build 30-day sliding window sequences
+    X_train, y_train, _ = LSTM_helper.make_sequences(
+        DATE_COL, train_scaled, cfg['LOOKBACK_DAYS'], FEATURE_COLS, TARGET_COL)
+    X_val, y_val, _     = LSTM_helper.make_sequences(
+        DATE_COL, val_scaled, cfg['LOOKBACK_DAYS'], FEATURE_COLS, TARGET_COL)
+
+    print(f'  {site_id} — train: {X_train.shape}  val: {X_val.shape}')
+
+    train_loader = DataLoader(
+        LSTM_helper.SequenceDataset(X_train, y_train),
+        batch_size=cfg['BATCH_SIZE'], shuffle=True)
+    val_loader = DataLoader(
+        LSTM_helper.SequenceDataset(X_val, y_val),
+        batch_size=cfg['BATCH_SIZE'], shuffle=False)
+
+    return train_loader, val_loader, target_scaler
+
+
+# Evaluate one site on its test period
+
+def evaluate_site(site_id: str, data_dir: str, model_dir: str, cfg: dict):
+    """
+    Load HydroDF for one site, prepare the test period using that site's
+    own saved scalers, run the trained model, and return results.
+
+    Returns dict with: dates, obs_cms, pred_cms, metrics, label, role
+    """
+    df = load_hydrodf(site_id, data_dir)
+    df = df[[DATE_COL] + FEATURE_COLS + [TARGET_COL]].copy()
+    df[FEATURE_COLS + [TARGET_COL]] = (
+        df[FEATURE_COLS + [TARGET_COL]]
+        .interpolate(method='linear', limit_direction='both')
+        .ffill().bfill()
+    )
+
+    _, _, test_df = split_by_year(
+        df, cfg['TRAIN_END_YEAR'], cfg['VAL_START_YEAR'], cfg['VAL_END_YEAR'],
+        cfg['TEST_START_YEAR'], cfg['TEST_END_YEAR']
+    )
+
+    # Load this site's own scalers — fit on its 1990–2014 training period
+    fs = joblib.load(os.path.join(model_dir, f'feature_scaler_{site_id}.pkl'))
+    ts = joblib.load(os.path.join(model_dir, f'target_scaler_{site_id}.pkl'))
+
+    # Write to the generic path so add_scaled_columns can find them
+    joblib.dump(fs, os.path.join(model_dir, 'feature_scaler.pkl'))
+    joblib.dump(ts, os.path.join(model_dir, 'target_scaler.pkl'))
+
+    test_scaled = LSTM_helper.add_scaled_columns(model_dir, FEATURE_COLS, TARGET_COL, test_df)
+    X_test, y_test, d_test = LSTM_helper.make_sequences(
+        DATE_COL, test_scaled, cfg['LOOKBACK_DAYS'], FEATURE_COLS, TARGET_COL)
+
+    test_loader = DataLoader(
+        LSTM_helper.SequenceDataset(X_test, y_test),
+        batch_size=cfg['BATCH_SIZE'], shuffle=False)
+
+    # Run model in eval mode
+    criterion = torch.nn.MSELoss()
+    _, pred_scaled, obs_scaled = LSTM_helper.evaluate(cfg['model'], criterion, cfg['device'], test_loader)
+
+    # Inverse-transform from scaled space back to cms
+    obs_cms  = ts.inverse_transform(obs_scaled.reshape(-1, 1)).ravel()
+    pred_cms = ts.inverse_transform(pred_scaled.reshape(-1, 1)).ravel()
+
+    metrics = compute_metrics(obs_cms, pred_cms)
+    label   = f'{cfg["SITES"][site_id]["name"].replace("_", " ")} ({cfg["SITES"][site_id]["role"]})'
+
+    return {
+        'dates':    d_test,
+        'obs_cms':  obs_cms,
+        'pred_cms': pred_cms,
+        'metrics':  metrics,
+        'label':    label,
+        'role':     cfg['SITES'][site_id]['role'],
+    }
+
+
+# Figures
 
 def plot_training_history(history: dict, fig_dir: str):
     """
@@ -165,7 +298,7 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
     if len(site_ids) == 1:
         axes = [axes]
 
-    fig.suptitle('Observed vs. Predicted Streamflow — Evaluation Period (2019–2023)',
+    fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019-2023)',
                  fontsize=13, fontweight='bold', y=1.01)
 
     for ax, sid in zip(axes, site_ids):
@@ -182,7 +315,7 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
 
         if r['role'] == 'Test':
             ax.set_facecolor('#fff3f3')
-            ax.set_title(f'{r["label"]}  ★ TEST — unseen during training',
+            ax.set_title(f'{r["label"]}  ★ TEST - unseen during training',
                          fontsize=9, loc='left', fontweight='bold')
         else:
             ax.set_title(r['label'], fontsize=9, loc='left')
@@ -213,7 +346,7 @@ def plot_scatter(results: dict, fig_dir: str):
     if len(site_ids) == 1:
         axes = [axes]
 
-    fig.suptitle('Observed vs. Predicted Streamflow — Scatter', fontsize=12, fontweight='bold')
+    fig.suptitle('Observed vs. Predicted Streamflow - Scatter', fontsize=12, fontweight='bold')
 
     for ax, sid in zip(axes, site_ids):
         r, m = results[sid], results[sid]['metrics']
@@ -255,7 +388,7 @@ def plot_performance_summary(results: dict, fig_dir: str):
     nse_vals  = [results[s]['metrics']['NSE']  for s in site_ids]
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
-    fig.suptitle('Performance Summary — All Sites (Evaluation Period 2019–2023)',
+    fig.suptitle('Performance Summary - All Sites (Evaluation Period 2019–2023)',
                  fontsize=12, fontweight='bold')
 
     for ax, vals, ylabel, title in zip(

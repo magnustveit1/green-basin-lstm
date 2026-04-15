@@ -73,6 +73,8 @@ from notebooks.train_utils import (
     train_model, compute_metrics, print_metrics,
     plot_training_history, plot_observed_vs_predicted,
     plot_scatter, plot_performance_summary,
+    prepare_site_loaders,
+    evaluate_site,
 )
 
 
@@ -110,132 +112,18 @@ VAL_END_YEAR    = 2018
 TEST_START_YEAR = 2019
 TEST_END_YEAR   = 2023
 
-
-# Helper: prepare one site's DataLoaders Helper
-
-def prepare_site_loaders(site_id: str):
-    """
-    Load HydroDF CSV for one site, split by year, fit scalers on training
-    data only, apply scalers, build sequences, and return DataLoaders.
-
-    Scalers are saved to model/ so they can be reloaded for evaluation.
-    Follows the professor's workflow from Hydro_LSTM.ipynb step by step.
-
-    Returns
-    -------
-    train_loader, val_loader : DataLoaders for this site
-    target_scaler            : fitted target scaler (needed for inverse-transform)
-    """
-    df = load_hydrodf(site_id, DATA_DIR)
-
-    # Keep only the columns needed, fill any gaps
-    df = df[[DATE_COL] + FEATURE_COLS + [TARGET_COL]].copy()
-    df[FEATURE_COLS + [TARGET_COL]] = (
-        df[FEATURE_COLS + [TARGET_COL]]
-        .interpolate(method='linear', limit_direction='both')
-        .ffill().bfill()
-    )
-
-    # Split by year
-    train_df, val_df, _ = split_by_year(
-        df, TRAIN_END_YEAR, VAL_START_YEAR, VAL_END_YEAR,
-        TEST_START_YEAR, TEST_END_YEAR
-    )
-
-    # Fit separate scalers on training data only — prevents data leakage
-    feature_scaler = MinMaxScaler()
-    target_scaler  = MinMaxScaler()
-    feature_scaler.fit(train_df[FEATURE_COLS])
-    target_scaler.fit(train_df[[TARGET_COL]])
-
-    # Save scalers — LSTM_helper.add_scaled_columns loads them by path
-    joblib.dump(feature_scaler, os.path.join(MODEL_DIR, 'feature_scaler.pkl'))
-    joblib.dump(target_scaler,  os.path.join(MODEL_DIR, 'target_scaler.pkl'))
-
-    # Also save with site ID so each site's scalers are preserved
-    joblib.dump(feature_scaler, os.path.join(MODEL_DIR, f'feature_scaler_{site_id}.pkl'))
-    joblib.dump(target_scaler,  os.path.join(MODEL_DIR, f'target_scaler_{site_id}.pkl'))
-
-    # Apply scalers — matches professor's add_scaled_columns pattern
-    train_scaled = LSTM_helper.add_scaled_columns(MODEL_DIR, FEATURE_COLS, TARGET_COL, train_df)
-    val_scaled   = LSTM_helper.add_scaled_columns(MODEL_DIR, FEATURE_COLS, TARGET_COL, val_df)
-
-    # Build 30-day sliding window sequences
-    X_train, y_train, _ = LSTM_helper.make_sequences(
-        DATE_COL, train_scaled, LOOKBACK_DAYS, FEATURE_COLS, TARGET_COL)
-    X_val, y_val, _     = LSTM_helper.make_sequences(
-        DATE_COL, val_scaled, LOOKBACK_DAYS, FEATURE_COLS, TARGET_COL)
-
-    print(f'  {site_id} — train: {X_train.shape}  val: {X_val.shape}')
-
-    train_loader = DataLoader(
-        LSTM_helper.SequenceDataset(X_train, y_train),
-        batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(
-        LSTM_helper.SequenceDataset(X_val, y_val),
-        batch_size=BATCH_SIZE, shuffle=False)
-
-    return train_loader, val_loader, target_scaler
-
-
-# Helper: evaluate one site on its test period
-
-def evaluate_site(site_id: str):
-    """
-    Load HydroDF for one site, prepare the test period using that site's
-    own saved scalers, run the trained model, and return results.
-
-    Returns dict with: dates, obs_cms, pred_cms, metrics, label, role
-    """
-    df = load_hydrodf(site_id, DATA_DIR)
-    df = df[[DATE_COL] + FEATURE_COLS + [TARGET_COL]].copy()
-    df[FEATURE_COLS + [TARGET_COL]] = (
-        df[FEATURE_COLS + [TARGET_COL]]
-        .interpolate(method='linear', limit_direction='both')
-        .ffill().bfill()
-    )
-
-    _, _, test_df = split_by_year(
-        df, TRAIN_END_YEAR, VAL_START_YEAR, VAL_END_YEAR,
-        TEST_START_YEAR, TEST_END_YEAR
-    )
-
-    # Load this site's own scalers — fit on its 1990–2014 training period
-    fs = joblib.load(os.path.join(MODEL_DIR, f'feature_scaler_{site_id}.pkl'))
-    ts = joblib.load(os.path.join(MODEL_DIR, f'target_scaler_{site_id}.pkl'))
-
-    # Write to the generic path so add_scaled_columns can find them
-    joblib.dump(fs, os.path.join(MODEL_DIR, 'feature_scaler.pkl'))
-    joblib.dump(ts, os.path.join(MODEL_DIR, 'target_scaler.pkl'))
-
-    test_scaled = LSTM_helper.add_scaled_columns(MODEL_DIR, FEATURE_COLS, TARGET_COL, test_df)
-    X_test, y_test, d_test = LSTM_helper.make_sequences(
-        DATE_COL, test_scaled, LOOKBACK_DAYS, FEATURE_COLS, TARGET_COL)
-
-    test_loader = DataLoader(
-        LSTM_helper.SequenceDataset(X_test, y_test),
-        batch_size=BATCH_SIZE, shuffle=False)
-
-    # Run model in eval mode
-    criterion = torch.nn.MSELoss()
-    _, pred_scaled, obs_scaled = LSTM_helper.evaluate(model, criterion, device, test_loader)
-
-    # Inverse-transform from scaled space back to cms
-    obs_cms  = ts.inverse_transform(obs_scaled.reshape(-1, 1)).ravel()
-    pred_cms = ts.inverse_transform(pred_scaled.reshape(-1, 1)).ravel()
-
-    metrics = compute_metrics(obs_cms, pred_cms)
-    label   = f'{SITES[site_id]["name"].replace("_", " ")} ({SITES[site_id]["role"]})'
-
-    return {
-        'dates':    d_test,
-        'obs_cms':  obs_cms,
-        'pred_cms': pred_cms,
-        'metrics':  metrics,
-        'label':    label,
-        'role':     SITES[site_id]['role'],
-    }
-
+cfg = {
+    'TRAIN_END_YEAR':  TRAIN_END_YEAR,
+    'VAL_START_YEAR':  VAL_START_YEAR,
+    'VAL_END_YEAR':    VAL_END_YEAR,
+    'TEST_START_YEAR': TEST_START_YEAR,
+    'TEST_END_YEAR':   TEST_END_YEAR,
+    'LOOKBACK_DAYS':   LOOKBACK_DAYS,
+    'BATCH_SIZE':      BATCH_SIZE,
+    'SITES':           SITES,
+    'model':           None,
+    'device':          device,
+}
 
 # Main pipeline
 
@@ -253,13 +141,13 @@ if __name__ == '__main__':
 
     for sid in TRAIN_IDS:
         print(f'\n  {SITES[sid]["role"]}: {sid}')
-        tl, vl, _ = prepare_site_loaders(sid)
+        tl, vl, _ = prepare_site_loaders(sid, DATA_DIR, MODEL_DIR, cfg)
         train_loaders.append(tl)
         val_loaders.append(vl)
 
     # Also prepare the test site's scalers now (fitted on its own train period)
     print(f'\n  Test site: {TEST_ID}')
-    _, _, _ = prepare_site_loaders(TEST_ID)
+    _, _, _ = prepare_site_loaders(TEST_ID, DATA_DIR, MODEL_DIR, cfg)
 
     # Combine all three training sites into single loaders for the training loop
     combined_train = DataLoader(
@@ -285,7 +173,7 @@ if __name__ == '__main__':
         model, combined_train, combined_val,
         device, EPOCHS, LEARNING_RATE, PATIENCE
     )
-    plot_training_history(history, FIG_DIR)
+    cfg['model'] = model
 
     # Save model using professor's save_model function
     ref_fs = joblib.load(os.path.join(MODEL_DIR, f'feature_scaler_{TRAIN_IDS[0]}.pkl'))
@@ -298,10 +186,10 @@ if __name__ == '__main__':
     results = {}
     for sid in TRAIN_IDS + [TEST_ID]:
         print(f'\n  {SITES[sid]["role"]}: {sid}')
-        results[sid] = evaluate_site(sid)
+        results[sid] = evaluate_site(sid, DATA_DIR, MODEL_DIR, cfg)
         print_metrics(results[sid]['label'], results[sid]['metrics'])
 
-    # ── Step 5: Generate figures ───────────────────────────────────────────
+    # Step 5: Generate figures
     print('\n[5/5] Generating figures...')
     plot_observed_vs_predicted(results, FIG_DIR)
     plot_scatter(results, FIG_DIR)
