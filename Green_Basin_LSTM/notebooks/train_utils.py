@@ -309,7 +309,6 @@ def plot_observed_vs_predicted(results: dict, fig_dir: str):
 
 
     fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019-2023)',
-    fig.suptitle('Observed vs. Predicted Streamflow - Evaluation Period (2019–2023)',
 
                  fontsize=13, fontweight='bold', y=1.01)
 
