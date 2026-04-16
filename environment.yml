@@ -1,0 +1,25 @@
+name: torch310env
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda        # GPU support — falls back to CPU automatically
+  - ca-certificates
+  - openssl
+  - ipykernel
+  - certifi
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - conda
+  - pip
+  - pip:
+    - sympy==1.13.1
+    - dataretrieval     # USGS NWIS streamflow retrieval
+    - pydaymet          # Daymet daily climate data retrieval
+    - joblib            # scaler serialization
