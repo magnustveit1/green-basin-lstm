@@ -1,10 +1,10 @@
-![Green Basin LSTM](figures/fig_observed_vs_predicted.png)
+![Green Basin LSTM](fig_observed_vs_predicted.png)
 
-# Green Basin LSTM — Unregulated Streamflow Prediction
+# Green Basin LSTM - Unregulated Streamflow Prediction
 
 **Repository:** https://github.com/magnustveit1/green-basin-lstm
 
-A PyTorch LSTM pipeline for predicting daily streamflow on unregulated tributaries of the Green River and Yampa/White River system. Developed as Assignment 3 for GEOG 6150 (Hydroinformatics) at the University of Utah.
+A PyTorch LSTM pipeline for predicting daily streamflow on unregulated tributaries of the Green River and Yampa/White River system. Developed as Assignment 3 for CVEEN 6920 (Hydroinformatics) at the University of Utah.
 
 The model trains on three sites with distinct but unregulated hydrologic regimes, then predicts cold on a fourth unseen location downstream on the Yampa River. All gauges are confirmed free-flowing with no major dams upstream.
 
@@ -32,7 +32,7 @@ green-basin-lstm/
 │   ├── data_utils.py        # Fetch, merge, split helper functions
 │   └── train_utils.py       # Training loop, metrics, plotting helpers
 ├── data/HydroDF/            # Auto-generated (git-ignored)
-├── model/                   # Auto-generated — saved weights + scalers (git-ignored)
+├── model/                   # Auto-generated - saved weights + scalers (git-ignored)
 ├── figures/                 # Auto-generated (git-ignored)
 ├── environment.yml
 ├── .gitignore
@@ -52,7 +52,7 @@ cd green-basin-lstm
 conda env create -f environment.yml
 conda activate torch310env
 
-# 3. Fetch data (run once — caches CSVs to data/HydroDF/)
+# 3. Fetch data (run once - caches CSVs to data/HydroDF/)
 python data_acquisition.py
 
 # 4. Train and evaluate
@@ -85,4 +85,4 @@ All USGS and Daymet data is fetched automatically. No manual downloads needed.
 
 ## Author
 
-Magnus Tveit · MS GIS, University of Utah · GEOG 6150 Hydroinformatics · Dr. Ryan Johnson
+Magnus Tveit · MSGIS, University of Utah · CVEEN 6920 Hydroinformatics · Dr. Ryan Johnson
